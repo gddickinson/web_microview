@@ -35,3 +35,7 @@ Then open `http://localhost:5006/app` in your browser. Upload a TIFF stack using
 web_microview/
 └── app.py    # MicroscopyDashboard class and Bokeh server app
 ```
+
+
+---
+*Built with AI assistance from [Claude (Anthropic)](https://claude.com/).*
