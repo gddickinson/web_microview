@@ -1,7 +1,9 @@
 """
 Web MicroView - Image utility functions.
 
-Handles TIFF loading, normalization, and ROI statistics computation.
+Handles TIFF loading, normalization, display scaling, ROI statistics and line profiles.
+Pixel coordinates use the corner origin (pixel (col, row) covers [col, col+1) x [row, row+1)),
+row 0 at the top, as in ImageJ/Fiji.
 """
 
 import numpy as np
@@ -35,7 +37,15 @@ def decode_uploaded_file(data_string):
     else:
         base64_data = data_string.split(',')[1]
         binary_data = base64.b64decode(base64_data)
+    return read_tiff_bytes(binary_data)
 
+
+def read_tiff_bytes(binary_data):
+    """Read TIFF file contents (bytes) to a 3D stack and a metadata dict.
+
+    Same result as ``decode_uploaded_file`` (which decodes base64 and calls this);
+    used directly by the web app for multipart uploads.
+    """
     buf = io.BytesIO(binary_data)
     metadata = {}
 
@@ -175,3 +185,34 @@ def extract_roi(frame, x0, y0, width, height):
     c0, r0, w, h = clip_roi(frame.shape, x0, y0, width, height)
     roi = frame[r0:r0 + h, c0:c0 + w]
     return roi, w, h
+
+
+def line_profile(frame, x0, y0, x1, y1):
+    """Intensity along a straight line, bilinearly interpolated (as ImageJ's line profile).
+
+    Endpoints are in corner-origin pixel coordinates (pixel centres at i + 0.5). The line is
+    sampled at ``n = max(2, round(length) + 1)`` evenly spaced points; samples are clamped to
+    the image edge.
+
+    Returns
+    -------
+    distance : np.ndarray
+        Distance of each sample from (x0, y0), in pixels.
+    values : np.ndarray
+        Interpolated intensities (float).
+    """
+    frame = np.asarray(frame, dtype=float)
+    rows, cols = frame.shape
+    length = float(np.hypot(x1 - x0, y1 - y0))
+    n = max(2, int(round(length)) + 1)
+    t = np.linspace(0.0, 1.0, n)
+    u = np.clip(x0 + t * (x1 - x0) - 0.5, 0, cols - 1)
+    v = np.clip(y0 + t * (y1 - y0) - 0.5, 0, rows - 1)
+    c0 = np.minimum(np.floor(u).astype(int), cols - 1)
+    r0 = np.minimum(np.floor(v).astype(int), rows - 1)
+    c1 = np.minimum(c0 + 1, cols - 1)
+    r1 = np.minimum(r0 + 1, rows - 1)
+    fu, fv = u - c0, v - r0
+    top = frame[r0, c0] * (1 - fu) + frame[r0, c1] * fu
+    bottom = frame[r1, c0] * (1 - fu) + frame[r1, c1] * fu
+    return t * length, top * (1 - fv) + bottom * fv

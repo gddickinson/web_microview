@@ -9,18 +9,18 @@ Single-file Bokeh server application (`app.py`) implementing a web-based microsc
 - [x] Add error handling for corrupt TIFF files and unsupported formats in file upload callback
 - [ ] Add support for multi-channel TIFF stacks (currently assumes single channel)
 - [x] Fix duplicate `ColumnDataSource` import in `app.py` (imported twice on line 3 and line 5)
-- [ ] Add configurable color maps (currently likely hardcoded)
+- [ ] Add configurable color maps (Bokeh: Greys256 hardcoded; web viewer has grey/inverted/green/magenta/hot)
 - [ ] Add a loading indicator during TIFF stack processing
 
 ## Feature Enhancements
-- [ ] Add line profile tool (draw a line, plot intensity along it)
+- [ ] Add line profile tool (draw a line, plot intensity along it) -- done in the web viewer; Bokeh toggle still a placeholder
 - [ ] Add z-projection modes (max intensity, mean, sum) for 3D stacks
 - [ ] Add measurement tools (distance, angle) with pixel-to-physical unit conversion
 - [ ] Add histogram equalization and contrast adjustment controls
 - [ ] Implement multi-ROI support (define several ROIs, compare statistics)
-- [ ] Add frame animation/playback with adjustable speed
+- [ ] Add frame animation/playback with adjustable speed -- done in the web viewer
 - [ ] Add overlay support for particle localizations (CSV import)
-- [ ] Add image export (current frame as PNG, ROI crop)
+- [ ] Add image export (current frame as PNG, ROI crop) -- web viewer: frame PNG, ROI stats CSV, profile CSV
 
 ## Long-term Vision
 - [ ] Migrate to Panel or HoloViews for richer interactive widgets
@@ -36,4 +36,4 @@ Single-file Bokeh server application (`app.py`) implementing a web-based microsc
 - [x] `empty_image` hardcoded to 512x512 -- should match uploaded image dimensions
 - [ ] ROI statistics computed synchronously -- could block UI on large images
 - [ ] No caching for computed statistics or processed frames
-- [ ] Missing `bokeh serve` launch instructions in a `Makefile` or script
+- [ ] Missing `bokeh serve` launch instructions in a `Makefile` or script (web app: `python run_web.py`)
