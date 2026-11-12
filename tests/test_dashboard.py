@@ -97,3 +97,16 @@ def test_single_frame_upload_after_a_stack(dash):
 def test_stats_axis_is_not_fixed_to_0_1(dash):
     upload(dash, np.full((1, 6, 6), 500, np.uint16))
     assert not (dash.stats_plot.y_range.start == 0 and dash.stats_plot.y_range.end == 1)
+
+
+def test_rgb_upload_is_one_frame_with_channel_selector(dash):
+    rgb = np.zeros((6, 8, 3), np.uint8)
+    rgb[..., 1] = np.arange(8)  # green ramp across x
+    buf = io.BytesIO()
+    tifffile.imwrite(buf, rgb, photometric="rgb")
+    dash.handle_file_upload("value", None, base64.b64encode(buf.getvalue()).decode())
+    assert dash.current_stack.shape == (1, 6, 8, 3)
+    assert dash.frame_slider.visible is False
+    assert dash.channel_select.visible and dash.channel_select.options == ["0 (R)", "1 (G)", "2 (B)"]
+    dash.channel_select.value = "1 (G)"
+    np.testing.assert_allclose(shown(dash), np.flipud(display_frame(rgb[..., 1], 1.0)))

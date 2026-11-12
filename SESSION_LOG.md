@@ -19,6 +19,6 @@ GitHub Pages export. Tests moved to `tests/`. Added `tiff_meta.py` (pixel size f
 Verified: the Bokeh app still serves (`bokeh serve app.py`, bokeh 3.10.2, numpy 1.26 from requirements.txt) and
 its tests pass in that environment.
 
-Open questions for George:
-- RGB/multi-sample TIFFs: `decode_uploaded_file` treats an (H, W, 3) image as H frames of W x 3 in the Bokeh app.
-  The web viewer shows such files with a channel selector; how should the Bokeh app handle them?
+Follow-up (2026-11-12, lead's instruction): RGB/multi-sample TIFFs were read by the Bokeh app as H frames of
+W x 3. `read_tiff_bytes` now returns (frames, H, W, samples) for them (samples last, also for planar files) and the
+dashboard has a Channel selector, like the web viewer (tests/test_rgb.py, tests/test_dashboard.py).

@@ -41,16 +41,21 @@ def decode_uploaded_file(data_string):
 
 
 def read_tiff_bytes(binary_data):
-    """Read TIFF file contents (bytes) to a 3D stack and a metadata dict.
+    """Read TIFF file contents (bytes) to a stack and a metadata dict.
 
     Same result as ``decode_uploaded_file`` (which decodes base64 and calls this);
     used directly by the web app for multipart uploads.
+
+    The stack is (frames, height, width) for single-sample images and
+    (frames, height, width, samples) for RGB / multi-sample images (samples last,
+    also for planar-separate files). ``metadata['Dimensions']`` is tifffile's own shape.
     """
     buf = io.BytesIO(binary_data)
     metadata = {}
 
     with tifffile.TiffFile(buf) as tif:
         stack = tif.asarray()
+        axes = tif.series[0].axes
 
         # Basic image properties
         metadata['Dimensions'] = f"{stack.shape}"
@@ -64,6 +69,17 @@ def read_tiff_bytes(binary_data):
                 for tag in page.tags.values():
                     metadata[tag.name] = str(tag.value)
 
+    if 'S' in axes and stack.ndim == len(axes):
+        # RGB / multi-sample: one colour image per frame, samples last
+        stack = np.moveaxis(stack, axes.index('S'), -1)
+        if stack.ndim == 3:
+            stack = stack[np.newaxis]
+        elif stack.ndim == 4:
+            pass
+        else:
+            raise ValueError(f"Unsupported image dimensions: {stack.ndim}")
+        return stack, metadata
+
     # Normalize to 3D
     if stack.ndim == 2:
         stack = np.array([stack])
@@ -73,6 +89,13 @@ def read_tiff_bytes(binary_data):
         raise ValueError(f"Unsupported image dimensions: {stack.ndim}")
 
     return stack, metadata
+
+
+def frame_channel(stack, index, channel=0):
+    """2D frame ``index`` of a stack from ``read_tiff_bytes``; for a multi-sample
+    stack (4D) the given sample/channel of that frame."""
+    frame = stack[index]
+    return frame[..., channel] if stack.ndim == 4 else frame
 
 
 def normalize_frame(frame):

@@ -7,6 +7,7 @@ A web-based microscopy image viewer and analysis dashboard built with Bokeh. Pro
 - **TIFF stack viewer** with frame-by-frame navigation
 - **ROI (Region of Interest) tools** -- box selection for intensity measurement
 - **Intensity analysis** with statistical summaries (mean, std, min, max, median) and a zoomed ROI view
+- **RGB / multi-sample TIFFs** shown one channel at a time (channel selector)
 - **Gamma (contrast) slider**; the line-profile toggle is a placeholder in the Bokeh app (not implemented yet)
 - **Metadata viewer** for TIFF file properties
 - **Interactive controls** -- sliders, buttons, file upload

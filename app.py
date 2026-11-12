@@ -11,11 +11,11 @@ from bokeh.layouts import column, row
 from bokeh.plotting import figure, curdoc
 from bokeh.models import (ColumnDataSource, Slider, FileInput,
                          Tabs, TabPanel, Div, Toggle,
-                         BoxSelectTool)
+                         BoxSelectTool, Select)
 import numpy as np
 
 from image_utils import (decode_uploaded_file, display_frame, compute_roi_stats,
-                         extract_roi, selection_to_roi)
+                         extract_roi, frame_channel, selection_to_roi)
 from roi_tools import create_roi_box
 
 # Default empty image dimensions
@@ -125,6 +125,10 @@ class MicroscopyDashboard:
         self.roi_toggle = Toggle(label="Enable ROI", button_type="success")
         self.roi_toggle.on_change('active', self.toggle_roi)
 
+        # RGB / multi-sample files: which sample (channel) to show and measure
+        self.channel_select = Select(title="Channel", options=["0"], value="0", visible=False)
+        self.channel_select.on_change('value', self.update_channel)
+
         self.line_profile_toggle = Toggle(label="Enable Line Profile", button_type="success")
         self.line_profile_toggle.on_change('active', self.toggle_line_profile)
 
@@ -173,7 +177,7 @@ class MicroscopyDashboard:
         if self.current_stack is None or not self.roi_source.data['x']:
             return
 
-        frame = self.current_stack[self.frame_slider.value if index is None else index]
+        frame = self.frame_at(self.frame_slider.value if index is None else index)
         x0 = self.roi_source.data['x'][0]
         y0 = self.roi_source.data['y'][0]
         w = self.roi_source.data['width'][0]
@@ -191,7 +195,7 @@ class MicroscopyDashboard:
         if self.current_stack is None or not self.roi_source.data['x']:
             return
 
-        frame = self.current_stack[self.frame_slider.value if index is None else index]
+        frame = self.frame_at(self.frame_slider.value if index is None else index)
         x0 = self.roi_source.data['x'][0]
         y0 = self.roi_source.data['y'][0]
         w = self.roi_source.data['width'][0]
@@ -205,6 +209,7 @@ class MicroscopyDashboard:
         controls = column(
             self.file_input,
             self.frame_slider,
+            self.channel_select,
             self.contrast_slider,
             self.roi_toggle,
             self.line_profile_toggle,
@@ -240,6 +245,13 @@ class MicroscopyDashboard:
                 h, w = self.current_stack.shape[1], self.current_stack.shape[2]
                 self.empty_image = np.zeros((h, w), dtype=np.uint16)
 
+                samples = self.current_stack.shape[3] if self.current_stack.ndim == 4 else 1
+                names = ["R", "G", "B"] if samples == 3 else [str(i) for i in range(samples)]
+                self.channel_select.options = ([f"{i} ({n})" for i, n in enumerate(names)]
+                                               if samples == 3 else names)
+                self.channel_select.value = self.channel_select.options[0]
+                self.channel_select.visible = samples > 1
+
                 num_frames = len(self.current_stack)
                 if num_frames > 1:
                     self.frame_slider.start = 0
@@ -259,6 +271,7 @@ class MicroscopyDashboard:
                 print(f"Traceback: {traceback.format_exc()}")
                 self.current_stack = None
                 self.metadata = {}
+                self.channel_select.visible = False
                 self.update_image_source(self.empty_image)
                 self.frame_slider.visible = False
                 self.update_metadata_display()
@@ -270,7 +283,7 @@ class MicroscopyDashboard:
                 if new < 0 or new >= len(self.current_stack):
                     print(f"Invalid frame index: {new}, stack size: {len(self.current_stack)}")
                     return
-                frame = self.current_stack[new]
+                frame = self.frame_at(new)
                 self.update_image_source(frame)
                 self.update_roi_view(new)
                 self.update_roi_stats(new)
@@ -278,6 +291,19 @@ class MicroscopyDashboard:
                 self.update_image_source(self.empty_image)
         except Exception as e:
             print(f"Error in update_frame: {str(e)}")
+
+    def channel_index(self):
+        """Selected sample/channel (0 for single-sample images)."""
+        return int(self.channel_select.value.split()[0])
+
+    def frame_at(self, index):
+        """2D frame to show/measure: the selected channel of an RGB/multi-sample frame."""
+        return frame_channel(self.current_stack, index, self.channel_index())
+
+    def update_channel(self, attr, old, new):
+        """Show and measure another channel of an RGB / multi-sample image"""
+        if self.current_stack is not None:
+            self.update_frame(None, None, self.frame_slider.value)
 
     def update_image_source(self, frame):
         """Update the image data source (gamma applied; flipped so row 0 is at the top)"""
@@ -291,7 +317,7 @@ class MicroscopyDashboard:
     def update_contrast(self, attr, old, new):
         """Update image contrast"""
         if self.current_stack is not None:
-            self.update_image_source(self.current_stack[self.frame_slider.value])
+            self.update_image_source(self.frame_at(self.frame_slider.value))
 
     def update_metadata_display(self):
         """Update the metadata display with current file information"""

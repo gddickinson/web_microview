@@ -11,7 +11,7 @@ route('about', () => {
   <div class="two">
     <div class="panel"><h3>Bokeh dashboard (original)</h3>
       <p>Image View tab: TIFF upload, frame slider, gamma (contrast) slider, ROI box selection with a zoomed ROI view and a
-        statistics bar chart. Metadata tab: shape, data type, value range and the TIFF tags. The line-profile toggle is a
+        statistics bar chart; a channel selector for RGB files. Metadata tab: shape, data type, value range and the TIFF tags. The line-profile toggle is a
         placeholder there.</p>
       <pre>pip install -r requirements.txt
 bokeh serve app.py

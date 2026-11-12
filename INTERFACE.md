@@ -47,13 +47,15 @@ with a browser viewer (`web/`), whose JS port of `image_utils.py` is tested agai
 - `MicroscopyDashboard` -- main Bokeh dashboard
   - `.handle_file_upload()` -- decodes uploaded TIFF via `image_utils.decode_uploaded_file`
   - `.update_frame()` / `.update_image_source()` -- frame display (gamma via `display_frame`, flipped so row 0 is on top)
+  - `.frame_at()` / `.update_channel()` -- channel selector for RGB / multi-sample files
   - `.update_roi()` -- box selection -> image pixels via `selection_to_roi`
   - `.update_roi_view()` / `.update_roi_stats()` -- ROI analysis using `image_utils`
   - `.setup_layout()` -- assembles Bokeh widgets into tabs
 
 ### image_utils.py
 - `decode_uploaded_file(data_string)` -- base64 decode -> `read_tiff_bytes`
-- `read_tiff_bytes(binary)` -- tifffile read -> (stack, metadata)
+- `read_tiff_bytes(binary)` -- tifffile read -> (stack, metadata); stack (frames, H, W) or (frames, H, W, samples) for RGB
+- `frame_channel(stack, index, channel)` -- 2D frame (one channel of a multi-sample frame)
 - `normalize_frame(frame)` / `display_frame(frame, gamma)` -- [0, 1] scaling for display
 - `selection_to_roi(x0, x1, y0, y1, image_height)` -- Bokeh plot box -> image pixels
 - `clip_roi`, `extract_roi`, `compute_roi_stats(frame, x0, y0, w, h)` -- mean, std, min, max, median
