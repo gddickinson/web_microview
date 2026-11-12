@@ -14,7 +14,8 @@ from bokeh.models import (ColumnDataSource, Slider, FileInput,
                          BoxSelectTool)
 import numpy as np
 
-from image_utils import decode_uploaded_file, normalize_frame, compute_roi_stats, extract_roi
+from image_utils import (decode_uploaded_file, display_frame, compute_roi_stats,
+                         extract_roi, selection_to_roi)
 from roi_tools import create_roi_box
 
 # Default empty image dimensions
@@ -105,8 +106,7 @@ class MicroscopyDashboard:
         self.stats_plot = figure(title='ROI Statistics',
                                tools='',
                                width=250, height=250,
-                               x_range=['Mean', 'Std Dev', 'Min', 'Max', 'Median'],
-                               y_range=(0, 1))
+                               x_range=['Mean', 'Std Dev', 'Min', 'Max', 'Median'])
         self.stats_plot.vbar(x='stat', top='value', source=self.roi_stats_source,
                             width=0.8)
 
@@ -115,7 +115,8 @@ class MicroscopyDashboard:
         self.frame_slider = Slider(start=0, end=1, value=0, step=1, title="Frame")
         self.frame_slider.on_change('value', self.update_frame)
 
-        self.contrast_slider = Slider(start=0, end=2, value=1, step=0.1, title="Contrast")
+        self.contrast_slider = Slider(start=0.1, end=2, value=1, step=0.1,
+                                     title="Gamma (contrast)")
         self.contrast_slider.on_change('value', self.update_contrast)
 
         self.file_input = FileInput(accept=".tif,.tiff", multiple=False)
@@ -156,20 +157,23 @@ class MicroscopyDashboard:
         self.roi_box.bottom = y0
         self.roi_box.top = y1
 
+        # roi_source holds image pixels (row 0 at the top); the plot shows the image flipped
+        height = self.current_stack.shape[1] if self.current_stack is not None else 0
+        col0, row0, w, h = selection_to_roi(x0, x1, y0, y1, height)
         self.roi_source.data = {
-            'x': [x0], 'y': [y0],
-            'width': [x1 - x0], 'height': [y1 - y0]
+            'x': [col0], 'y': [row0],
+            'width': [w], 'height': [h]
         }
 
         self.update_roi_view()
         self.update_roi_stats()
 
-    def update_roi_view(self):
+    def update_roi_view(self, index=None):
         """Update the ROI zoomed view"""
         if self.current_stack is None or not self.roi_source.data['x']:
             return
 
-        frame = self.current_stack[self.frame_slider.value]
+        frame = self.current_stack[self.frame_slider.value if index is None else index]
         x0 = self.roi_source.data['x'][0]
         y0 = self.roi_source.data['y'][0]
         w = self.roi_source.data['width'][0]
@@ -177,17 +181,17 @@ class MicroscopyDashboard:
 
         roi, width, height = extract_roi(frame, x0, y0, w, h)
         self.roi_image_source.data = {
-            'image': [roi],
+            'image': [np.flipud(roi)],
             'dw': [width],
             'dh': [height]
         }
 
-    def update_roi_stats(self):
+    def update_roi_stats(self, index=None):
         """Update ROI statistics"""
         if self.current_stack is None or not self.roi_source.data['x']:
             return
 
-        frame = self.current_stack[self.frame_slider.value]
+        frame = self.current_stack[self.frame_slider.value if index is None else index]
         x0 = self.roi_source.data['x'][0]
         y0 = self.roi_source.data['y'][0]
         w = self.roi_source.data['width'][0]
@@ -243,6 +247,7 @@ class MicroscopyDashboard:
                     self.frame_slider.value = 0
                     self.frame_slider.visible = True
                 else:
+                    self.frame_slider.value = 0
                     self.frame_slider.visible = False
 
                 self.update_frame(None, None, 0)
@@ -267,16 +272,18 @@ class MicroscopyDashboard:
                     return
                 frame = self.current_stack[new]
                 self.update_image_source(frame)
+                self.update_roi_view(new)
+                self.update_roi_stats(new)
             else:
                 self.update_image_source(self.empty_image)
         except Exception as e:
             print(f"Error in update_frame: {str(e)}")
 
     def update_image_source(self, frame):
-        """Update the image data source"""
-        normalized = normalize_frame(frame)
+        """Update the image data source (gamma applied; flipped so row 0 is at the top)"""
+        shown = np.flipud(display_frame(frame, self.contrast_slider.value))
         self.image_source.data = {
-            'image': [normalized],
+            'image': [shown],
             'dw': [frame.shape[1]],
             'dh': [frame.shape[0]]
         }
@@ -284,9 +291,7 @@ class MicroscopyDashboard:
     def update_contrast(self, attr, old, new):
         """Update image contrast"""
         if self.current_stack is not None:
-            frame = self.current_stack[self.frame_slider.value]
-            frame = np.power(frame, 1/new)
-            self.update_image_source(frame)
+            self.update_image_source(self.current_stack[self.frame_slider.value])
 
     def update_metadata_display(self):
         """Update the metadata display with current file information"""

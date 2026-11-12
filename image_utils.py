@@ -86,6 +86,29 @@ def normalize_frame(frame):
     return (frame - f_min) / (f_max - f_min)
 
 
+def display_frame(frame, gamma=1.0):
+    """Frame scaled to [0, 1] for display with a gamma (the dashboard's contrast slider).
+
+    The frame is min-max normalised first and then raised to ``1 / gamma``, so data with
+    negative values (int16, float) displays correctly and gamma 1 equals ``normalize_frame``.
+    """
+    if gamma <= 0:
+        raise ValueError("gamma must be > 0")
+    norm = normalize_frame(np.asarray(frame, dtype=float))
+    return norm if gamma == 1 else np.power(norm, 1.0 / gamma)
+
+
+def selection_to_roi(x0, x1, y0, y1, image_height):
+    """Convert a box drawn on the Bokeh plot to (col0, row0, width, height) in image pixels.
+
+    The dashboard shows the image flipped (``np.flipud``) so row 0 is at the top, as in
+    ImageJ/Fiji; plot y therefore runs upwards from the bottom row: row = image_height - y.
+    """
+    left, right = min(x0, x1), max(x0, x1)
+    bottom, top = min(y0, y1), max(y0, y1)
+    return left, image_height - top, right - left, top - bottom
+
+
 def clip_roi(frame_shape, x0, y0, width, height):
     """Clip a rectangle to the image and return integer (col0, row0, width, height).
 
