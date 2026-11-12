@@ -7,7 +7,7 @@ import numpy as np
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from image_utils import normalize_frame, compute_roi_stats, extract_roi
 

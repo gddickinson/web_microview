@@ -86,6 +86,30 @@ def normalize_frame(frame):
     return (frame - f_min) / (f_max - f_min)
 
 
+def clip_roi(frame_shape, x0, y0, width, height):
+    """Clip a rectangle to the image and return integer (col0, row0, width, height).
+
+    Coordinates are in pixels with the origin at the corner of pixel (0, 0): the box covers
+    columns from x0 for ``width`` pixels and rows from y0 for ``height`` pixels. The part of
+    the box left of / above the image is cut off first (so a box starting at x0 = -5 loses
+    5 pixels of width), then the corner and size are truncated with ``int()`` and clipped
+    to the far edges. A box that misses the image gives width or height 0.
+    """
+    rows, cols = frame_shape[0], frame_shape[1]
+    if x0 < 0:
+        width, x0 = width + x0, 0
+    if y0 < 0:
+        height, y0 = height + y0, 0
+    c0 = min(int(x0), cols)
+    r0 = min(int(y0), rows)
+    w = max(0, int(min(cols - c0, width)))
+    h = max(0, int(min(rows - r0, height)))
+    return c0, r0, w, h
+
+
+STAT_NAMES = ['Mean', 'Std Dev', 'Min', 'Max', 'Median']
+
+
 def compute_roi_stats(frame, x0, y0, width, height):
     """Compute intensity statistics for a rectangular ROI.
 
@@ -93,25 +117,22 @@ def compute_roi_stats(frame, x0, y0, width, height):
     ----------
     frame : np.ndarray
         2D image array.
-    x0, y0 : int
-        Top-left corner of the ROI.
-    width, height : int
-        Dimensions of the ROI.
+    x0, y0 : float
+        Corner of the ROI (column, row), pixel-corner origin; may lie outside the image.
+    width, height : float
+        Dimensions of the ROI; only the part overlapping the image is used.
 
     Returns
     -------
     stats : dict
-        Keys: 'stat' (list of names), 'value' (list of floats).
+        Keys: 'stat' (list of names), 'value' (list of floats; NaN when the
+        ROI does not overlap the image). Std Dev is the population value (ddof=0).
     """
-    x0 = int(max(0, x0))
-    y0 = int(max(0, y0))
-    width = int(min(frame.shape[1] - x0, width))
-    height = int(min(frame.shape[0] - y0, height))
-
-    roi = frame[y0:y0 + height, x0:x0 + width]
-
+    roi, _, _ = extract_roi(frame, x0, y0, width, height)
+    if roi.size == 0:
+        return {'stat': list(STAT_NAMES), 'value': [float('nan')] * len(STAT_NAMES)}
     return {
-        'stat': ['Mean', 'Std Dev', 'Min', 'Max', 'Median'],
+        'stat': list(STAT_NAMES),
         'value': [
             float(np.mean(roi)),
             float(np.std(roi)),
@@ -125,12 +146,9 @@ def compute_roi_stats(frame, x0, y0, width, height):
 def extract_roi(frame, x0, y0, width, height):
     """Extract a rectangular ROI from a frame.
 
-    Returns the ROI sub-array and its actual dimensions (clipped to bounds).
+    Returns the ROI sub-array and its actual dimensions (clipped to bounds,
+    see ``clip_roi``).
     """
-    x0 = int(max(0, x0))
-    y0 = int(max(0, y0))
-    width = int(min(frame.shape[1] - x0, width))
-    height = int(min(frame.shape[0] - y0, height))
-
-    roi = frame[y0:y0 + height, x0:x0 + width]
-    return roi, width, height
+    c0, r0, w, h = clip_roi(frame.shape, x0, y0, width, height)
+    roi = frame[r0:r0 + h, c0:c0 + w]
+    return roi, w, h
